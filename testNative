@@ -1,0 +1,314 @@
+1. Setup Project
+First, ensure you have Node.js, npm, and React Native CLI installed. Then run:
+
+bash
+
+Collapse
+
+Wrap
+
+Copy
+npx react-native init MoviesApp
+cd MoviesApp
+npm install
+2. Install Dependencies
+We'll need these libraries:
+
+bash
+
+Collapse
+
+Wrap
+
+Copy
+npm install @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context
+npm install axios
+For iOS, run:
+
+bash
+
+Collapse
+
+Wrap
+
+Copy
+cd ios && pod install && cd ..
+3. Folder Structure
+Create this structure in your project root:
+
+text
+
+Collapse
+
+Wrap
+
+Copy
+MoviesApp/
+├── src/
+│   ├── components/       # Reusable components
+│   ├── screens/         # Screen components
+│   ├── navigation/      # Navigation setup
+│   ├── services/        # API calls
+│   ├── assets/          # Images, fonts, etc.
+│   └── constants/       # API keys, colors, etc.
+├── App.js               # Entry point
+└── ...                  # Other default files
+4. API Setup
+Sign up at TMDb and get an API key.
+Create src/constants/api.js:
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+export const API_KEY = 'YOUR_API_KEY_HERE';
+export const BASE_URL = 'https://api.themoviedb.org/3';
+Create src/services/api.js:
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import axios from 'axios';
+import { API_KEY, BASE_URL } from '../constants/api';
+
+export const getPopularMovies = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}/movie/popular?api_key=${API_KEY}`);
+    return response.data.results;
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
+
+export const getMovieDetails = async (movieId) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}`);
+    return response.data;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+5. Navigation Setup
+Create src/navigation/AppNavigator.js:
+
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import HomeScreen from '../screens/HomeScreen';
+import MovieDetailsScreen from '../screens/MovieDetailsScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
+
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+const HomeStack = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="MovieDetails" component={MovieDetailsScreen} />
+  </Stack.Navigator>
+);
+
+const AppNavigator = () => (
+  <NavigationContainer>
+    <Tab.Navigator>
+      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: 'Home' }} />
+      <Tab.Screen name="Favorites" component={FavoritesScreen} />
+    </Tab.Navigator>
+  </NavigationContainer>
+);
+
+export default AppNavigator;
+Update App.js:
+
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import React from 'react';
+import AppNavigator from './src/navigation/AppNavigator';
+
+const App = () => {
+  return <AppNavigator />;
+};
+
+export default App;
+6. Components
+Create src/components/MovieCard.js:
+
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import React from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+
+const MovieCard = ({ movie, onPress }) => (
+  <TouchableOpacity onPress={onPress} style={styles.card}>
+    <Image
+      source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
+      style={styles.image}
+    />
+    <View style={styles.info}>
+      <Text style={styles.title}>{movie.title}</Text>
+      <Text style={styles.rating}>Rating: {movie.vote_average}</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+const styles = StyleSheet.create({
+  card: { flexDirection: 'row', margin: 10, backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden' },
+  image: { width: 100, height: 150 },
+  info: { padding: 10, flex: 1 },
+  title: { fontSize: 16, fontWeight: 'bold' },
+  rating: { fontSize: 14, color: '#666' },
+});
+
+export default MovieCard;
+7. Screens
+src/screens/HomeScreen.js:
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, FlatList, StyleSheet } from 'react-native';
+import MovieCard from '../components/MovieCard';
+import { getPopularMovies } from '../services/api';
+
+const HomeScreen = ({ navigation }) => {
+  const [movies, setMovies] = useState([]);
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      const data = await getPopularMovies();
+      setMovies(data);
+    };
+    fetchMovies();
+  }, []);
+
+  const renderItem = ({ item }) => (
+    <MovieCard
+      movie={item}
+      onPress={() => navigation.navigate('MovieDetails', { movieId: item.id })}
+    />
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        data={movies}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id.toString()}
+      />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+});
+
+export default HomeScreen;
+src/screens/MovieDetailsScreen.js:
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, ScrollView, Image, Text, StyleSheet } from 'react-native';
+import { getMovieDetails } from '../services/api';
+
+const MovieDetailsScreen = ({ route }) => {
+  const { movieId } = route.params;
+  const [movie, setMovie] = useState(null);
+
+  useEffect(() => {
+    const fetchMovie = async () => {
+      const data = await getMovieDetails(movieId);
+      setMovie(data);
+    };
+    fetchMovie();
+  }, [movieId]);
+
+  if (!movie) return <Text>Loading...</Text>;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView>
+        <Image
+          source={{ uri: `https://image.tmdb.org/t/p/w500${movie.backdrop_path}` }}
+          style={styles.backdrop}
+        />
+        <View style={styles.content}>
+          <Text style={styles.title}>{movie.title}</Text>
+          <Text style={styles.overview}>{movie.overview}</Text>
+          <Text style={styles.details}>Rating: {movie.vote_average}</Text>
+          <Text style={styles.details}>Release: {movie.release_date}</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff' },
+  backdrop: { width: '100%', height: 200 },
+  content: { padding: 15 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
+  overview: { fontSize: 16, color: '#333', marginBottom: 10 },
+  details: { fontSize: 14, color: '#666' },
+});
+
+export default MovieDetailsScreen;
+src/screens/FavoritesScreen.js (basic placeholder):
+javascript
+
+Collapse
+
+Wrap
+
+Copy
+import React from 'react';
+import { SafeAreaView, Text, StyleSheet } from 'react-native';
+
+const FavoritesScreen = () => (
+  <SafeAreaView style={styles.container}>
+    <Text>Favorites Screen (To be implemented)</Text>
+  </SafeAreaView>
+);
+
+const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+});
+
+export default FavoritesScreen;
+8. Run the App
+For Android: npx react-native run-android
